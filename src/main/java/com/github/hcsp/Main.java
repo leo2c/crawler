@@ -18,8 +18,6 @@ public class Main {
         try {
             System.out.println(response1.getStatusLine());
             HttpEntity entity1 = response1.getEntity();
-            // do something useful with the response body
-            // and ensure it is fully consumed
             EntityUtils.consume(entity1);
         } finally {
             response1.close();
