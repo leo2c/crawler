@@ -51,10 +51,11 @@ public class Main {
     private static void storeIntoDatabaseIfItIsNewsPage(Document document) {
         ArrayList<Element> articleTags = document.select("article");
         if (!articleTags.isEmpty()) {
-            for (Element articleTag : articleTags) {
+            articleTags.stream().map(articleTag->articleTag.child(0).text()).forEach(System.out::println);
+           /* for (Element articleTag : articleTags) {
                 String title = articleTag.child(0).text();
                 System.out.println(title);
-            }
+            }*/
         }
     }
 
