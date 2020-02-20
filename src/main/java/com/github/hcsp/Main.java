@@ -21,10 +21,6 @@ public class Main {
     public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.106 Safari/537.36";
 
     public static void main(String[] args) throws IOException {
-        Integer i = null;
-        if (i == 1) {
-            System.out.println("lalala");
-        }
         List<String> linkPool = new ArrayList<>();
         Set<String> processedLinks = new HashSet<>();
         linkPool.add(ROOT_HTML);
