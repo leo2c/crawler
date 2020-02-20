@@ -1,6 +1,7 @@
 package com.github.hcsp;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -52,10 +53,6 @@ public class Main {
         ArrayList<Element> articleTags = document.select("article");
         if (!articleTags.isEmpty()) {
             articleTags.stream().map(articleTag->articleTag.child(0).text()).forEach(System.out::println);
-           /* for (Element articleTag : articleTags) {
-                String title = articleTag.child(0).text();
-                System.out.println(title);
-            }*/
         }
     }
 
