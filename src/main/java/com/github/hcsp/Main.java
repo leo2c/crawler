@@ -2,7 +2,6 @@ package com.github.hcsp;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.http.HttpEntity;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -24,6 +23,7 @@ public class Main {
 
     @SuppressFBWarnings("DMI_CONSTANT_DB_PASSWORD")
     public static void main(String[] args) throws SQLException {
+        Connection connection = DriverManager.getConnection(JDBC_URL, USER_NAME, PASSWORD);
         while (true) {
             List<String> linkPool = loadUrlsFromDatabase(connection, "SELECT link FROM NEWS.PUBLIC.LINKS_TO_BE_PROCESSED");
             if (linkPool.isEmpty()) {
