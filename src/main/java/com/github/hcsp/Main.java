@@ -1,5 +1,6 @@
 package com.github.hcsp;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -11,51 +12,91 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.sql.*;
+import java.util.*;
 
 public class Main {
-    public static final String ROOT_HTML = "https://sina.cn";
     public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.106 Safari/537.36";
+    public static final String JDBC_URL = "jdbc:h2:file:D://Leo/WorkSpace/hcsp/30_Chapter_Crawler/news";
+    public static final String USER_NAME = "root";
+    public static final String PASSWORD = "root";
 
-    public static void main(String[] args) {
-        List<String> linkPool = new ArrayList<>();
-        Set<String> processedLinks = new HashSet<>();
-        linkPool.add(ROOT_HTML);
+    @SuppressFBWarnings("DMI_CONSTANT_DB_PASSWORD")
+    public static void main(String[] args) throws SQLException {
+        Connection connection = DriverManager.getConnection(JDBC_URL, USER_NAME, PASSWORD);
         while (true) {
+            List<String> linkPool = loadUrlsFromDatabase(connection, "SELECT link FROM NEWS.PUBLIC.LINKS_TO_BE_PROCESSED");
             if (linkPool.isEmpty()) {
                 break;
             }
-            // ArrayList从尾部删除更有效率
-            String link = linkPool.remove(linkPool.size() - 1);
-            //是否处理过了
-            if (processedLinks.contains(link)) {
-                continue;
-            }
-            if (isInterestingLink(link)) {
+            String link = linkPool.get(linkPool.size() - 1);
+            deleteOrUpdateLinkFormDatabase(connection, "DELETE FROM NEWS.PUBLIC.LINKS_TO_BE_PROCESSED WHERE link = ?", link);
+            if (isInterestingLink(link) && (!isLinkProcessed(connection, link))) {
                 try {
                     Document document = httpGetDocumentParseHtml(link);
-                    document.select("a").stream().map(aTag -> aTag.attr("href")).forEach(linkPool::add);
-                    storeIntoDatabaseIfItIsNewsPage(document);
+                    parseUrlsFromPageAndStoreIntoDatabase(connection, document);
+                    storeIntoDatabaseIfItIsNewsPage(connection, "INSERT INTO NEWS.PUBLIC.NEWS (title) values(?)", document);
                 } catch (Exception e) {
+                    deleteOrUpdateLinkFormDatabase(connection, "INSERT INTO NEWS.PUBLIC.LINKS_FAILED_PROCESSED (link) values(?)", link);
                     System.out.println("链接解析失败:" + link);
                 } finally {
-                    processedLinks.add(link);
+                    deleteOrUpdateLinkFormDatabase(connection, "INSERT INTO NEWS.PUBLIC.LINKS_ALREADY_PROCESSED (link) values(?)", link);
                 }
             }
         }
     }
 
-    private static void storeIntoDatabaseIfItIsNewsPage(Document document) {
+    private static void parseUrlsFromPageAndStoreIntoDatabase(Connection connection, Document document) throws SQLException {
+        for (Element aTag : document.select("a")) {
+            String href = aTag.attr("href");
+            deleteOrUpdateLinkFormDatabase(connection, "INSERT INTO NEWS.PUBLIC.LINKS_TO_BE_PROCESSED (link) values(?)", href);
+        }
+    }
+
+    private static boolean isLinkProcessed(Connection connection, String link) throws SQLException {
+        ResultSet resultSet = null;
+        try (PreparedStatement statement = connection.prepareStatement("SELECT * FROM NEWS.PUBLIC.LINKS_ALREADY_PROCESSED WHERE LINK = ?")) {
+            statement.setString(1, link);
+            resultSet = statement.executeQuery();
+            while (resultSet.next()) {
+                return true;
+            }
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+        }
+        return false;
+    }
+
+    private static ArrayList<String> loadUrlsFromDatabase(Connection connection, String sql) throws SQLException {
+        ArrayList<String> linkPool = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql); ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                linkPool.add(resultSet.getString(1));
+            }
+        }
+        return linkPool;
+    }
+
+    private static int deleteOrUpdateLinkFormDatabase(Connection connection, String sql, String link) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, link);
+            return statement.executeUpdate();
+        }
+    }
+
+    private static void storeIntoDatabaseIfItIsNewsPage(Connection connection, String sql, Document document) throws SQLException {
         ArrayList<Element> articleTags = document.select("article");
         if (!articleTags.isEmpty()) {
-            articleTags.stream().map(articleTag -> articleTag.child(0).text()).forEach(System.out::println);
-           /* for (Element articleTag : articleTags) {
-                String title = articleTag.child(0).text();
-                System.out.println(title);
-            }*/
+            for (Element articleTag : articleTags) {
+                String text = articleTag.child(0).text();
+                System.out.println(text);
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    statement.setString(1, text);
+                    statement.executeUpdate();
+                }
+            }
         }
     }
 
@@ -67,7 +108,6 @@ public class Main {
         System.out.println("link:" + link);
         HttpGet httpGet = new HttpGet(link);
         httpGet.addHeader("User-Agent", USER_AGENT);
-
         try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
             HttpEntity entity = response.getEntity();
             String html = EntityUtils.toString(entity);
