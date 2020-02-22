@@ -10,12 +10,15 @@ import org.apache.http.util.EntityUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Main {
+
     public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.106 Safari/537.36";
     public static final String JDBC_URL = "jdbc:h2:file:D://Leo/WorkSpace/hcsp/30_Chapter_Crawler/news";
     public static final String USER_NAME = "root";
@@ -24,18 +27,14 @@ public class Main {
     @SuppressFBWarnings("DMI_CONSTANT_DB_PASSWORD")
     public static void main(String[] args) throws SQLException {
         Connection connection = DriverManager.getConnection(JDBC_URL, USER_NAME, PASSWORD);
-        while (true) {
-            List<String> linkPool = loadUrlsFromDatabase(connection, "SELECT link FROM NEWS.PUBLIC.LINKS_TO_BE_PROCESSED");
-            if (linkPool.isEmpty()) {
-                break;
-            }
-            String link = linkPool.get(linkPool.size() - 1);
-            deleteOrUpdateLinkFormDatabase(connection, "DELETE FROM NEWS.PUBLIC.LINKS_TO_BE_PROCESSED WHERE link = ?", link);
-            if (isInterestingLink(link) && (!isLinkProcessed(connection, link))) {
+        String link;
+        while ((link = getNextLinkThenDelete(connection)) != null) {
+            if (!isLinkProcessed(connection, link)) {
                 try {
+                    System.out.println("link:" + link);
                     Document document = httpGetDocumentParseHtml(link);
                     parseUrlsFromPageAndStoreIntoDatabase(connection, document);
-                    storeIntoDatabaseIfItIsNewsPage(connection, "INSERT INTO NEWS.PUBLIC.NEWS (title) values(?)", document);
+                    storeIntoDatabaseIfItIsNewsPage(connection, document, link);
                 } catch (Exception e) {
                     deleteOrUpdateLinkFormDatabase(connection, "INSERT INTO NEWS.PUBLIC.LINKS_FAILED_PROCESSED (link) values(?)", link);
                     System.out.println("链接解析失败:" + link);
@@ -46,10 +45,20 @@ public class Main {
         }
     }
 
+    private static String getNextLinkThenDelete(Connection connection) throws SQLException {
+        String link = getNextLink(connection, "SELECT link FROM NEWS.PUBLIC.LINKS_TO_BE_PROCESSED LIMIT 1");
+        if (link != null) {
+            deleteOrUpdateLinkFormDatabase(connection, "DELETE FROM NEWS.PUBLIC.LINKS_TO_BE_PROCESSED WHERE link = ?", link);
+        }
+        return link;
+    }
+
     private static void parseUrlsFromPageAndStoreIntoDatabase(Connection connection, Document document) throws SQLException {
         for (Element aTag : document.select("a")) {
             String href = aTag.attr("href");
-            deleteOrUpdateLinkFormDatabase(connection, "INSERT INTO NEWS.PUBLIC.LINKS_TO_BE_PROCESSED (link) values(?)", href);
+            if (isInterestingLink(href)) {
+                deleteOrUpdateLinkFormDatabase(connection, "INSERT INTO NEWS.PUBLIC.LINKS_TO_BE_PROCESSED (link) values(?)", href);
+            }
         }
     }
 
@@ -69,14 +78,14 @@ public class Main {
         return false;
     }
 
-    private static ArrayList<String> loadUrlsFromDatabase(Connection connection, String sql) throws SQLException {
-        ArrayList<String> linkPool = new ArrayList<>();
-        try (PreparedStatement statement = connection.prepareStatement(sql); ResultSet resultSet = statement.executeQuery()) {
+    private static String getNextLink(Connection connection, String sql) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
-                linkPool.add(resultSet.getString(1));
+                return resultSet.getString(1);
             }
         }
-        return linkPool;
+        return null;
     }
 
     private static int deleteOrUpdateLinkFormDatabase(Connection connection, String sql, String link) throws SQLException {
@@ -86,14 +95,22 @@ public class Main {
         }
     }
 
-    private static void storeIntoDatabaseIfItIsNewsPage(Connection connection, String sql, Document document) throws SQLException {
+    private static void storeIntoDatabaseIfItIsNewsPage(Connection connection, Document document, String url) throws SQLException {
         ArrayList<Element> articleTags = document.select("article");
         if (!articleTags.isEmpty()) {
             for (Element articleTag : articleTags) {
-                String text = articleTag.child(0).text();
-                System.out.println(text);
+                String title = articleTag.child(0).text();
+                ArrayList<Element> sections = articleTag.select("section");
+                String content = "";
+                for (Element sectionTag : sections) {
+                    content += sectionTag.select("p").stream().map(Element::text).collect(Collectors.joining("\r\n"));
+                }
+                System.out.println(title);
+                String sql = "INSERT INTO NEWS.PUBLIC.NEWS (TITLE,CONTENT,URL,CREATED_AT,MODIFIED_AT) values(?,?,?,now(),now())";
                 try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                    statement.setString(1, text);
+                    statement.setString(1, title);
+                    statement.setString(2, content);
+                    statement.setString(3, url);
                     statement.executeUpdate();
                 }
             }
@@ -105,7 +122,6 @@ public class Main {
         if (link.startsWith("//")) {
             link = "https:" + link;
         }
-        System.out.println("link:" + link);
         HttpGet httpGet = new HttpGet(link);
         httpGet.addHeader("User-Agent", USER_AGENT);
         try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
@@ -116,18 +132,15 @@ public class Main {
     }
 
     public static boolean isInterestingLink(String link) {
-        return (isNewsPage(link) || isIndexPage(link)) && isNotLoginPage(link);
+        return isNewsPage(link) && isNotNewsIndex(link);
     }
 
     public static boolean isNewsPage(String link) {
         return link.contains("news.sina.cn");
     }
 
-    public static boolean isIndexPage(String link) {
-        return link.equals("https://sina.cn");
+    private static boolean isNotNewsIndex(String link) {
+        return !link.equals("https://news.sina.cn/");
     }
 
-    public static boolean isNotLoginPage(String link) {
-        return !(link.contains("passport.sina.cn") || link.contains("passport.weibo.com"));
-    }
 }
