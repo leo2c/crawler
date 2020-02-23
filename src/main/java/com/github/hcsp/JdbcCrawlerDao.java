@@ -8,7 +8,7 @@ public class JdbcCrawlerDao implements CrawlerDao {
     public static final String JDBC_URL = "jdbc:h2:file:D://Leo/WorkSpace/hcsp/30_Chapter_Crawler/news";
     public static final String USER_NAME = "root";
     public static final String PASSWORD = "root";
-    Connection connection = null;
+    Connection connection;
 
     @SuppressFBWarnings("DMI_CONSTANT_DB_PASSWORD")
     public JdbcCrawlerDao() {
@@ -27,7 +27,7 @@ public class JdbcCrawlerDao implements CrawlerDao {
         return link;
     }
 
-    public String getNextLink(String sql) throws SQLException {
+    private String getNextLink(String sql) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
@@ -37,7 +37,7 @@ public class JdbcCrawlerDao implements CrawlerDao {
         return null;
     }
 
-    public int deleteOrUpdateLinkFormDatabase(String sql, String link) throws SQLException {
+    private int deleteOrUpdateLinkFormDatabase(String sql, String link) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, link);
             return statement.executeUpdate();
@@ -60,7 +60,7 @@ public class JdbcCrawlerDao implements CrawlerDao {
         return false;
     }
 
-    public void insertNew(String title, String content, String url) throws SQLException {
+    public void insertNewIntoDatabase(String title, String content, String url) throws SQLException {
         String sql = "INSERT INTO NEWS.PUBLIC.NEWS (TITLE,CONTENT,URL,CREATED_AT,MODIFIED_AT) values(?,?,?,now(),now())";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, title);
@@ -68,5 +68,20 @@ public class JdbcCrawlerDao implements CrawlerDao {
             statement.setString(3, url);
             statement.executeUpdate();
         }
+    }
+
+    @Override
+    public void insertFailedLink(String link) throws SQLException {
+        deleteOrUpdateLinkFormDatabase("INSERT INTO NEWS.PUBLIC.LINKS_FAILED_PROCESSED (link) values(?)", link);
+    }
+
+    @Override
+    public void insertAlreadyProcessedLink(String link) throws SQLException {
+        deleteOrUpdateLinkFormDatabase("INSERT INTO NEWS.PUBLIC.LINKS_ALREADY_PROCESSED (link) values(?)", link);
+    }
+
+    @Override
+    public void insertToBeProcessedLink(String href) throws SQLException {
+        deleteOrUpdateLinkFormDatabase("INSERT INTO NEWS.PUBLIC.LINKS_TO_BE_PROCESSED (link) values(?)", href);
     }
 }
