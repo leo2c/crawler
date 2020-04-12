@@ -49,6 +49,11 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.19</version>
+        </dependency>
+        <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>annotations</artifactId>
             <version>3.0.1</version>
@@ -57,6 +62,11 @@
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis</artifactId>
             <version>3.5.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.elasticsearch.client</groupId>
+            <artifactId>elasticsearch-rest-high-level-client</artifactId>
+            <version>7.6.0</version>
         </dependency>
     </dependencies>
 
@@ -121,15 +131,15 @@
                 <artifactId>flyway-maven-plugin</artifactId>
                 <version>6.2.4</version>
                 <configuration>
-                    <url>jdbc:h2:file:D://Leo/WorkSpace/hcsp/30_Chapter_Crawler/news</url>
+                    <url>jdbc:mysql://localhost:3306/NEWS?characterEncoding=utf-8</url>
                     <user>root</user>
                     <password>root</password>
                 </configuration>
                 <dependencies>
                     <dependency>
-                        <groupId>com.h2database</groupId>
-                        <artifactId>h2</artifactId>
-                        <version>1.4.199</version>
+                        <groupId>mysql</groupId>
+                        <artifactId>mysql-connector-java</artifactId>
+                        <version>8.0.19</version>
                     </dependency>
                 </dependencies>
             </plugin>
