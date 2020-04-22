@@ -18,7 +18,7 @@ public class ElasticsearchEngine {
         while (true) {
             System.out.println("Please input a search keyword:");
 
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in, "utf-8"));
 
             String keyword = bufferedReader.readLine();
 
