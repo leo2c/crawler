@@ -49,14 +49,10 @@ public class Crawler extends Thread {
         }
     }
 
-    public static void main(String[] args){
-        new Crawler(new MyBatisDao()).run();
-    }
-
     private void parseUrlsFromPageAndStoreIntoDatabase(Document document) throws SQLException {
         for (Element aTag : document.select("a")) {
             String href = aTag.attr("href");
-                dao.insertToBeProcessedLink(href);
+            dao.insertToBeProcessedLink(href);
         }
     }
 
