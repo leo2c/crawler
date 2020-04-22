@@ -8,7 +8,6 @@ import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.DecimalFormat;
 import java.time.Instant;
 import java.util.List;
 import java.util.Random;
@@ -21,7 +20,7 @@ public class MockDataGenerator {
             String resource = "db/mybatis/config.xml";
             InputStream inputStream = Resources.getResourceAsStream(resource);
             SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(inputStream);
-            mockData(sqlSessionFactory, 100_0000);
+            mockData(sqlSessionFactory, 2000);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -36,14 +35,16 @@ public class MockDataGenerator {
                 while (count-- > 0) {
                     int index = random.nextInt(currentNews.size() - 1);
                     News NewsToBeInserted = currentNews.get(index);
-                    Instant createdAt = NewsToBeInserted.getCreatedAt();
-                    Instant randomTime = createdAt.minusSeconds(random.nextInt(3600 * 24 * 365));
+                    Instant randomTime = Instant.now().minusSeconds(random.nextInt(3600 * 24 * 365));
                     NewsToBeInserted.setCreatedAt(randomTime);
                     NewsToBeInserted.setModifiedAt(randomTime);
+                    if (NewsToBeInserted.getContent().length() > 20) {
+                        NewsToBeInserted.setContent(NewsToBeInserted.getContent().substring(0, 20));
+                    }
                     session.insert(NAME_SPACE + "insertNews", NewsToBeInserted);
-                    Double rate = (double) count / howMany;
-                    System.out.println("Degree of completion:" + new DecimalFormat("#.00").format(rate) + "%");
-                    if (count % 2000 == 0){
+                    Double rate = (1 - ((double) count / howMany)) * 100;
+                    System.out.println("Degree of completion:" + String.format("%.2f", rate) + "%");
+                    if (count % 2000 == 0) {
                         session.flushStatements();
                     }
                 }

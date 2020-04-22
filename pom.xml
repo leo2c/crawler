@@ -129,7 +129,7 @@
             <plugin>
                 <groupId>org.flywaydb</groupId>
                 <artifactId>flyway-maven-plugin</artifactId>
-                <version>6.2.4</version>
+                <version>6.3.3</version>
                 <configuration>
                     <url>jdbc:mysql://localhost:3306/NEWS?characterEncoding=utf-8</url>
                     <user>root</user>
